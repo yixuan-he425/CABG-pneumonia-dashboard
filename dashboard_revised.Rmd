@@ -1,0 +1,909 @@
+---
+title: "Pneumonia Incidence After CABG Surgery (2015–2021)"
+author: "Yixuan He"
+output: 
+  flexdashboard::flex_dashboard:
+    orientation: rows
+    vertical_layout: fill
+    theme: cosmo
+    source_code: embed
+    self_contained: true
+    navbar:
+      - { title: "GitHub", icon: "fa-github", href: "https://github.com/yixuan-he425/CABG-pneumonia-dashboard", align: right }
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
+library(flexdashboard)
+library(plotly)
+library(DT)
+library(dplyr)
+library(tidyr)
+library(crosstalk)
+```
+
+<style>
+/* Force black text in all panels */
+.chart-wrapper .chart-shim,
+.chart-wrapper .chart-shim * {
+  color: #000000 !important;
+}
+/* Make chart-shim fill its container so flexbox vertical centering works */
+.chart-shim {
+  height: 100% !important;
+  overflow: auto !important;
+}
+/* Key Findings list */
+.chart-shim ul { font-size: 17px !important; line-height: 1.8 !important; }
+.chart-shim ul li { font-size: 17px !important; margin-bottom: 6px !important; }
+.chart-shim p  { font-size: 17px !important; line-height: 1.8 !important; }
+
+/* Footer (real-world impact) */
+.dashboard-footer {
+  font-size: 13px;
+  color: #000;
+  background: #f4f6f8;
+  border-top: 2px solid #2E75B6;
+  padding: 8px 18px;
+  text-align: center;
+}
+</style>
+
+```{r data-prep}
+# ============================================
+# DATA FOR VISUALIZATION 1 (incidence.csv)
+# ============================================
+inc_raw <- read.csv("incidence.csv", fileEncoding = "UTF-8")
+names(inc_raw) <- gsub("^\uFEFF", "", names(inc_raw))
+names(inc_raw) <- gsub("^X\\.", "", names(inc_raw))
+
+annual <- inc_raw %>%
+  group_by(YEAR) %>%
+  summarise(
+    Patients        = n(),
+    Pneumonia_Cases = sum(PNEUMONIA),
+    Pneumonia_Rate  = round(Pneumonia_Cases / Patients * 100, 1),
+    .groups = "drop"
+  ) %>%
+  arrange(YEAR) %>%
+  mutate(
+    Cumulative_Patients = cumsum(Patients),
+    Cumulative_Cases    = cumsum(Pneumonia_Cases),
+    Cumulative_Rate     = round(Cumulative_Cases / Cumulative_Patients * 100, 1),
+    Rate_Change         = round(Pneumonia_Rate - lag(Pneumonia_Rate), 1)
+  )
+
+# ============================================
+# DATA FOR VISUALIZATION 2 (cohort CSV)
+# ============================================
+cohort <- read.csv("CABG_pneumonia_cohort_clean_refine.csv")
+names(cohort) <- trimws(names(cohort))
+
+# Reverse one-hot: Race
+cohort$Race <- case_when(
+  cohort$RACE_0 == 1 ~ "White",
+  cohort$RACE_1 == 1 ~ "Black or African American",
+  cohort$RACE_2 == 1 ~ "Asian",
+  cohort$RACE_3 == 1 ~ "Other",
+  cohort$RACE_4 == 1 ~ "Unknown/Not Reported",
+  TRUE ~ NA_character_
+)
+
+# Reverse one-hot: Anesthesia
+cohort$Anesthesia <- ifelse(cohort$ANESTHES_General == 1,
+                            "General Anesthesia", "Other Anesthesia")
+
+# Reverse one-hot: Diabetes
+cohort$Diabetes <- case_when(
+  cohort$DIAB_no == 1          ~ "No",
+  cohort$DIAB_non.insulin == 1 ~ "Non-insulin",
+  cohort$DIAB_insulin == 1     ~ "Insulin",
+  TRUE ~ NA_character_
+)
+
+# Factor labels
+cohort$Gender <- factor(cohort$GENDER, levels = c(0, 1),
+                        labels = c("Male", "Female"))
+
+cohort$ASA_Class <- factor(cohort$ASACLAS, levels = 1:5,
+  labels = c("ASA 1", "ASA 2", "ASA 3", "ASA 4", "ASA 5"))
+
+cohort$Functional_Status <- factor(cohort$FNSTATUS2, levels = c(0, 1, 2),
+  labels = c("Independent", "Partially Dependent", "Totally Dependent"))
+
+# Binary variables
+binary_map <- c(
+  "SMOKER" = "Smoker", "HXCOPD" = "COPD History", "ASCITES" = "Ascites",
+  "HXCHF" = "CHF History", "HYPERMED" = "Hypertension", "DIALYSIS" = "Dialysis",
+  "STEROID" = "Steroid Use", "BLEEDIS" = "Bleeding Disorder",
+  "DISCANCR" = "Disseminated Cancer", "TRANSFUSION" = "Preop Transfusion"
+)
+
+for (orig in names(binary_map)) {
+  cohort[[binary_map[[orig]]]] <- factor(cohort[[orig]], levels = c(0, 1),
+                                         labels = c("No", "Yes"))
+}
+
+cohort$Pneumonia <- factor(cohort$PNEUMONIA, levels = c(0, 1),
+                           labels = c("No Pneumonia", "Pneumonia"))
+
+# Color palette
+clr_no  <- "#66c2a5"
+clr_yes <- "#fc8d62"
+
+# Reusable takeaway HTML
+takeaway_eda <- '<div style="display: flex; align-items: center; height: 100%; padding: 5px 15px; overflow: hidden;">
+<div style="color: #000000; font-size: 13px; line-height: 1.6; text-align: left; border-left: 5px solid #2E75B6; background: #eef2f7; padding: 12px 18px; border-radius: 0 8px 8px 0; width: 100%;">
+The exploratory dashboard shows that postoperative pneumonia is a <strong>relatively rare outcome, affecting about 5% of CABG patients</strong>. The study population is mostly older and male, with pneumonia cases appearing across the same broad patient groups seen in the full cohort. Some characteristics — such as <strong>bleeding disorders, preoperative transfusion, and higher BUN values</strong> — appear more common among pneumonia cases, but these patterns are descriptive only and would need further analysis to confirm.
+</div>
+</div>'
+```
+
+Incidence Over Time {data-icon="fa-chart-line"}
+=======================================================================
+
+Row {data-height=80}
+-----------------------------------------------------------------------
+
+### Total CABG Patients {.value-box}
+
+```{r}
+valueBox(format(sum(annual$Patients), big.mark = ","),
+         icon = "fa-users", color = "primary")
+```
+
+### Overall Pneumonia Rate {.value-box}
+
+```{r}
+overall_rate <- round(sum(annual$Pneumonia_Cases) / sum(annual$Patients) * 100, 1)
+valueBox(paste0(overall_rate, "%"), icon = "fa-lungs", color = "warning")
+```
+
+### Peak Year {.value-box}
+
+```{r}
+peak <- annual %>% filter(Pneumonia_Rate == max(Pneumonia_Rate))
+valueBox(paste0(peak$YEAR, " (", peak$Pneumonia_Rate, "%)"),
+         icon = "fa-arrow-up", color = "danger")
+```
+
+### Study Period {.value-box}
+
+```{r}
+valueBox("2015 – 2021", icon = "fa-calendar", color = "info")
+```
+
+Row {data-height=550}
+-----------------------------------------------------------------------
+
+### Annual & Cumulative Pneumonia Incidence
+
+```{r}
+hover_annual <- paste0(
+  "<b>", annual$YEAR, "</b><br>",
+  "Annual Pneumonia Rate: ", annual$Pneumonia_Rate, "%<br>",
+  annual$Pneumonia_Cases, " / ", format(annual$Patients, big.mark = ","), " patients",
+  ifelse(!is.na(annual$Rate_Change),
+         paste0("<br>Change vs prior: ",
+                ifelse(annual$Rate_Change > 0, "+", ""), annual$Rate_Change, " pp"),
+         "")
+)
+
+hover_cum <- paste0(
+  "<b>", annual$YEAR, "</b><br>",
+  "Cumulative Pneumonia Rate: ", annual$Cumulative_Rate, "%"
+)
+
+hover_bar <- paste0(
+  "<b>", annual$YEAR, "</b><br>",
+  "Cumulative CABG Patients: ", format(annual$Cumulative_Patients, big.mark = ",")
+)
+
+covid_row <- annual %>% filter(YEAR == 2020)
+
+plot_ly() %>%
+  add_bars(
+    data = annual, x = ~YEAR, y = ~Cumulative_Patients,
+    name = "Cumulative CABG Patients", marker = list(color = "rgba(200,200,200,0.45)"),
+    width = 0.6, yaxis = "y2",
+    hovertext = hover_bar, hoverinfo = "text", textposition = "none"
+  ) %>%
+  add_trace(
+    data = annual, x = ~YEAR, y = ~Pneumonia_Rate,
+    type = "scatter", mode = "lines+markers",
+    name = "Annual Pneumonia Rate (%)",
+    line = list(color = "#E74C3C", width = 3),
+    marker = list(color = "#E74C3C", size = 9),
+    text = hover_annual, hoverinfo = "text"
+  ) %>%
+  add_trace(
+    data = annual, x = ~YEAR, y = ~Cumulative_Rate,
+    type = "scatter", mode = "lines+markers",
+    name = "Cumulative Pneumonia Rate (%)",
+    line = list(color = "#2ECC71", width = 2, dash = "dash"),
+    marker = list(color = "#2ECC71", size = 6),
+    text = hover_cum, hoverinfo = "text"
+  ) %>%
+  add_annotations(
+    x = annual$YEAR, y = annual$Pneumonia_Rate,
+    text = paste0("<b>", annual$Pneumonia_Rate, "%</b>"),
+    showarrow = FALSE, yshift = 18,
+    font = list(color = "#E74C3C", size = 11)
+  ) %>%
+  add_annotations(
+    x = 2020, y = covid_row$Pneumonia_Rate,
+    text = paste0("<b>2020: COVID-era spike</b><br>(+", covid_row$Rate_Change, " pp)"),
+    showarrow = TRUE, arrowhead = 2, arrowsize = 1.2,
+    arrowcolor = "#C0392B", ax = -80, ay = -50,
+    font = list(color = "#C0392B", size = 11),
+    bgcolor = "rgba(255,255,255,0.9)",
+    bordercolor = "#C0392B", borderwidth = 1, borderpad = 5
+  ) %>%
+  layout(
+    title = list(
+    text = "<b>Pneumonia Incidence After CABG Surgery (2015–2021)</b>",
+    font = list(size = 20),
+    y = 0.97),
+    xaxis = list(title = "Year", tickmode = "linear", dtick = 1,
+                 range = c(2014.3, 2021.7), tickvals = 2015:2021),
+    yaxis = list(title = "Pneumonia Rate (%)", range = c(0, 9), side = "left"),
+    yaxis2 = list(title = "Cumulative CABG Patients", overlaying = "y", side = "right",
+                  showgrid = FALSE, range = c(0, max(annual$Cumulative_Patients) * 1.15)),
+    legend = list(orientation = "h", x = 0.5, xanchor = "center", y = -0.18),
+    hovermode = "x unified",
+    margin = list(l = 70, r = 80, t = 50, b = 90)
+  )
+```
+
+Row {data-height=300}
+-----------------------------------------------------------------------
+
+### Summary Table
+
+```{r}
+# NOTE: column names use backticks to allow spaces.
+# formatStyle below targets the renamed column "Annual Pneumonia Rate".
+tbl <- annual %>%
+  select(
+    `Year`                        = YEAR,
+    `CABG Patients`               = Patients,
+    `Pneumonia Cases`             = Pneumonia_Cases,
+    `Annual Pneumonia Rate`       = Pneumonia_Rate,
+    `Pneumonia Rate Change (pp)`  = Rate_Change,
+    `Cum. CABG Patients`          = Cumulative_Patients,
+    `Cum. Pneumonia Cases`        = Cumulative_Cases,
+    `Cum. Pneumonia Rate`         = Cumulative_Rate
+  )
+
+datatable(tbl,
+  options = list(pageLength = 10, dom = "t", ordering = TRUE,
+                 scrollY = "100%", scrollCollapse = TRUE, paging = FALSE,
+                 columnDefs = list(list(className = "dt-center", targets = "_all"))),
+  rownames = FALSE, class = "cell-border stripe hover"
+) %>%
+  formatStyle("Annual Pneumonia Rate",
+    background = styleColorBar(c(0, 10), "rgba(231,76,60,0.3)"),
+    backgroundSize = "98% 80%", backgroundRepeat = "no-repeat",
+    backgroundPosition = "center")
+```
+
+### Takeaways
+
+<div style="display: flex; align-items: center; height: 100%; padding: 5px 15px; overflow: hidden;">
+<div style="color: #000000; font-size: 13px; line-height: 1.6; text-align: left; border-left: 5px solid #2E75B6; background: #eef2f7; padding: 12px 18px; border-radius: 0 8px 8px 0; width: 100%;">
+<strong>The annual pneumonia rate among CABG patients fluctuates between 3.9% and 7.2% from 2015 to 2021</strong>, with no clear long-term upward or downward trend. A noticeable spike occurs in <strong>2020 (7.2%)</strong>, which stands out compared with surrounding years and may reflect disruptions during the COVID-19 era or changes in perioperative risk. Despite these yearly fluctuations, the <strong>overall cumulative incidence remains stable around 5%</strong>, suggesting that the overall pneumonia burden in the cohort was relatively consistent over time.
+</div>
+</div>
+
+
+Outcome Distribution {data-icon="fa-pie-chart"}
+=======================================================================
+
+Row {data-height=80}
+-----------------------------------------------------------------------
+
+### No Pneumonia {.value-box}
+
+```{r}
+n_no  <- sum(cohort$Pneumonia == "No Pneumonia")
+valueBox(format(n_no, big.mark = ","),
+         caption = paste0("No Pneumonia (", round(n_no/nrow(cohort)*100, 1), "%)"),
+         icon = "fa-check-circle", color = "success")
+```
+
+### Pneumonia {.value-box}
+
+```{r}
+n_yes <- sum(cohort$Pneumonia == "Pneumonia")
+valueBox(format(n_yes, big.mark = ","),
+         caption = paste0("Pneumonia (", round(n_yes/nrow(cohort)*100, 1), "%)"),
+         icon = "fa-exclamation-triangle", color = "danger")
+```
+
+### Imbalance Ratio {.value-box}
+
+```{r}
+valueBox(paste0(round(n_no / n_yes, 1), " : 1"),
+         caption = "No PNA : PNA ratio", icon = "fa-balance-scale", color = "info")
+```
+
+Row {data-height=550}
+-----------------------------------------------------------------------
+
+### Pneumonia Outcome Distribution
+
+```{r}
+tbl_pie <- cohort %>%
+  count(Pneumonia) %>%
+  mutate(pct = round(n / sum(n) * 100, 1))
+
+plot_ly(tbl_pie,
+  labels = ~Pneumonia, values = ~n, type = "pie",
+  textinfo = "text",
+  text = ~paste0(pct, "%\n(", format(n, big.mark = ","), ")"),
+  textposition = "inside", textfont = list(size = 14),
+  hovertext = ~paste0(Pneumonia, "<br>", format(n, big.mark = ","),
+                      " patients (", pct, "%)"),
+  hoverinfo = "text",
+  marker = list(colors = c(clr_no, clr_yes),
+                line = list(color = "#fff", width = 2)),
+  pull = c(0, 0.05)
+) %>%
+  layout(
+    title = list(text = "<b>Pneumonia Outcome Distribution</b>", font = list(size = 20)),
+    showlegend = TRUE,
+    legend = list(font = list(size = 12)),
+    margin = list(l = 30, r = 30, t = 50, b = 30)
+  )
+```
+
+### Key Findings
+
+- **Pneumonia is rare (~5%)** in the CABG cohort, creating a class-imbalanced outcome.
+- **Most patients (~95%)** do not develop postoperative pneumonia.
+- This **class imbalance matters for modeling**: techniques such as SMOTE, class weighting, or PR-AUC (instead of ROC-AUC) may be needed to build effective predictive models.
+- The low event rate also means that even small shifts in risk factor prevalence can noticeably affect the observed pneumonia rate year-to-year.
+
+Row {data-height=150}
+-----------------------------------------------------------------------
+
+### Takeaways
+
+```{r, results='asis'}
+cat(takeaway_eda)
+```
+
+
+Categorical Variables {data-icon="fa-bar-chart" data-navmenu="Cohort EDA"}
+=======================================================================
+
+```{r cat-helper}
+# Helper function: create a categorical bar chart
+cat_bar <- function(data, var_col, display_name, mode = "stack") {
+  df_plot <- data %>%
+    filter(!is.na(.data[[var_col]])) %>%
+    count(.data[[var_col]], Pneumonia) %>%
+    rename(Category = 1)
+  
+  if (mode == "pct") {
+    df_plot <- df_plot %>%
+      group_by(Category) %>%
+      mutate(pct = round(n / sum(n) * 100, 1)) %>%
+      ungroup()
+    
+    plot_ly(df_plot, x = ~Category, y = ~pct, color = ~Pneumonia,
+      colors = c(clr_no, clr_yes), type = "bar",
+      hovertext = ~paste0(Category, "<br>", Pneumonia, ": ",
+                          pct, "% (n=", format(n, big.mark = ","), ")"),
+      hoverinfo = "text"
+    ) %>%
+      layout(barmode = "stack",
+             yaxis = list(title = "Proportion (%)", range = c(0, 105)))
+  } else {
+    plot_ly(df_plot, x = ~Category, y = ~n, color = ~Pneumonia,
+      colors = c(clr_no, clr_yes), type = "bar",
+      hovertext = ~paste0(Category, "<br>", Pneumonia, ": ",
+                          format(n, big.mark = ",")),
+      hoverinfo = "text"
+    ) %>%
+      layout(barmode = mode, yaxis = list(title = "Count"))
+  }
+}
+
+cat_styled <- function(p, display_name) {
+  p %>% layout(
+    title = list(text = paste0("<b>", display_name, " vs Pneumonia</b>"),
+                 font = list(size = 20)),
+    xaxis = list(title = display_name),
+    legend = list(title = list(text = "Outcome")),
+    hovermode = "closest",
+    margin = list(l = 60, r = 30, t = 50, b = 80)
+  )
+}
+```
+
+Row {.tabset data-height=550}
+-----------------------------------------------------------------------
+
+### Gender (Count)
+
+```{r}
+cat_bar(cohort, "Gender", "Gender", "stack") %>% cat_styled("Gender")
+```
+
+### Gender (%)
+
+```{r}
+cat_bar(cohort, "Gender", "Gender", "pct") %>% cat_styled("Gender")
+```
+
+### Race (Count)
+
+```{r}
+cat_bar(cohort, "Race", "Race", "stack") %>% cat_styled("Race")
+```
+
+### Race (%)
+
+```{r}
+cat_bar(cohort, "Race", "Race", "pct") %>% cat_styled("Race")
+```
+
+### ASA Class (Count)
+
+```{r}
+cat_bar(cohort, "ASA_Class", "ASA Class", "stack") %>% cat_styled("ASA Class")
+```
+
+### ASA Class (%)
+
+```{r}
+cat_bar(cohort, "ASA_Class", "ASA Class", "pct") %>% cat_styled("ASA Class")
+```
+
+### Diabetes (Count)
+
+```{r}
+cat_bar(cohort, "Diabetes", "Diabetes", "stack") %>% cat_styled("Diabetes")
+```
+
+### Diabetes (%)
+
+```{r}
+cat_bar(cohort, "Diabetes", "Diabetes", "pct") %>% cat_styled("Diabetes")
+```
+
+### Functional Status (Count)
+
+```{r}
+cat_bar(cohort, "Functional_Status", "Functional Status", "stack") %>%
+  cat_styled("Functional Status")
+```
+
+### Functional Status (%)
+
+```{r}
+cat_bar(cohort, "Functional_Status", "Functional Status", "pct") %>%
+  cat_styled("Functional Status")
+```
+
+### Anesthesia (Count)
+
+```{r}
+cat_bar(cohort, "Anesthesia", "Anesthesia", "stack") %>% cat_styled("Anesthesia")
+```
+
+### Anesthesia (%)
+
+```{r}
+cat_bar(cohort, "Anesthesia", "Anesthesia", "pct") %>% cat_styled("Anesthesia")
+```
+
+Row {data-height=150}
+-----------------------------------------------------------------------
+
+### Takeaways
+
+```{r, results='asis'}
+cat(takeaway_eda)
+```
+
+
+Comorbidities {data-icon="fa-heartbeat" data-navmenu="Cohort EDA"}
+=======================================================================
+
+Row {.tabset data-height=550}
+-----------------------------------------------------------------------
+
+### Smoker (Count)
+
+```{r}
+cat_bar(cohort, "Smoker", "Smoker", "stack") %>% cat_styled("Smoker")
+```
+
+### Smoker (%)
+
+```{r}
+cat_bar(cohort, "Smoker", "Smoker", "pct") %>% cat_styled("Smoker")
+```
+
+### COPD (Count)
+
+```{r}
+cat_bar(cohort, "COPD History", "COPD History", "stack") %>% cat_styled("COPD History")
+```
+
+### COPD (%)
+
+```{r}
+cat_bar(cohort, "COPD History", "COPD History", "pct") %>% cat_styled("COPD History")
+```
+
+### CHF (Count)
+
+```{r}
+cat_bar(cohort, "CHF History", "CHF History", "stack") %>% cat_styled("CHF History")
+```
+
+### CHF (%)
+
+```{r}
+cat_bar(cohort, "CHF History", "CHF History", "pct") %>% cat_styled("CHF History")
+```
+
+### Hypertension (Count)
+
+```{r}
+cat_bar(cohort, "Hypertension", "Hypertension", "stack") %>% cat_styled("Hypertension")
+```
+
+### Hypertension (%)
+
+```{r}
+cat_bar(cohort, "Hypertension", "Hypertension", "pct") %>% cat_styled("Hypertension")
+```
+
+### Bleeding Disorder (Count)
+
+```{r}
+cat_bar(cohort, "Bleeding Disorder", "Bleeding Disorder", "stack") %>%
+  cat_styled("Bleeding Disorder")
+```
+
+### Bleeding Disorder (%)
+
+```{r}
+cat_bar(cohort, "Bleeding Disorder", "Bleeding Disorder", "pct") %>%
+  cat_styled("Bleeding Disorder")
+```
+
+### Preop Transfusion (Count)
+
+```{r}
+cat_bar(cohort, "Preop Transfusion", "Preop Transfusion", "stack") %>%
+  cat_styled("Preop Transfusion")
+```
+
+### Preop Transfusion (%)
+
+```{r}
+cat_bar(cohort, "Preop Transfusion", "Preop Transfusion", "pct") %>%
+  cat_styled("Preop Transfusion")
+```
+
+### Dialysis (Count)
+
+```{r}
+cat_bar(cohort, "Dialysis", "Dialysis", "stack") %>% cat_styled("Dialysis")
+```
+
+### Steroid Use (Count)
+
+```{r}
+cat_bar(cohort, "Steroid Use", "Steroid Use", "stack") %>% cat_styled("Steroid Use")
+```
+
+### Disseminated Cancer (Count)
+
+```{r}
+cat_bar(cohort, "Disseminated Cancer", "Disseminated Cancer", "stack") %>%
+  cat_styled("Disseminated Cancer")
+```
+
+### Ascites (Count)
+
+```{r}
+cat_bar(cohort, "Ascites", "Ascites", "stack") %>% cat_styled("Ascites")
+```
+
+Row {data-height=150}
+-----------------------------------------------------------------------
+
+### Takeaways
+
+```{r, results='asis'}
+cat(takeaway_eda)
+```
+
+
+Continuous Variables {data-icon="fa-chart-area" data-navmenu="Cohort EDA"}
+=======================================================================
+
+```{r cont-helper}
+# Helper: histogram + boxplot for a continuous variable
+cont_plot <- function(data, var_col, display_name, nbins = 30) {
+  df <- data %>%
+    filter(!is.na(.data[[var_col]])) %>%
+    select(value = all_of(var_col), Pneumonia)
+  
+  hist_no  <- df %>% filter(Pneumonia == "No Pneumonia") %>% pull(value)
+  hist_yes <- df %>% filter(Pneumonia == "Pneumonia") %>% pull(value)
+  
+  p_hist <- plot_ly(alpha = 0.7) %>%
+    add_histogram(x = hist_no, name = "No Pneumonia",
+                  marker = list(color = clr_no, line = list(color = "black", width = 0.3)),
+                  nbinsx = nbins, hoverinfo = "x+y+name") %>%
+    add_histogram(x = hist_yes, name = "Pneumonia",
+                  marker = list(color = clr_yes, line = list(color = "black", width = 0.3)),
+                  nbinsx = nbins, hoverinfo = "x+y+name") %>%
+    layout(barmode = "stack",
+           xaxis = list(title = display_name),
+           yaxis = list(title = "Count"))
+  
+  p_box <- plot_ly() %>%
+    add_boxplot(x = hist_no, name = "No Pneumonia",
+                marker = list(color = clr_no), line = list(color = clr_no),
+                fillcolor = "rgba(102,194,165,0.4)", hoverinfo = "x+name") %>%
+    add_boxplot(x = hist_yes, name = "Pneumonia",
+                marker = list(color = clr_yes), line = list(color = clr_yes),
+                fillcolor = "rgba(252,141,98,0.4)", hoverinfo = "x+name") %>%
+    layout(xaxis = list(showticklabels = FALSE, title = ""),
+           yaxis = list(showticklabels = FALSE, title = ""))
+  
+  subplot(p_box, p_hist, nrows = 2, shareX = TRUE, heights = c(0.25, 0.75)) %>%
+    layout(
+      title = list(text = paste0("<b>",display_name, " Distribution by Pneumonia Status</b>"),
+                   font = list(size = 20)),
+      showlegend = TRUE,
+      legend = list(title = list(text = "Outcome"), orientation = "v", x = 1.02, y = 0.5),
+      margin = list(l = 60, r = 80, t = 50, b = 60),
+      hovermode = "closest"
+    )
+}
+```
+
+Row {.tabset data-height=550}
+-----------------------------------------------------------------------
+
+### Age (years)
+
+```{r}
+cont_plot(cohort, "AGE_num", "Age (years)", 30)
+```
+
+### BMI (kg/m²)
+
+```{r}
+cont_plot(cohort, "BMI", "BMI (kg/m²)", 30)
+```
+
+### WBC (×10⁹/L)
+
+```{r}
+cont_plot(cohort, "PRWBC", "WBC (×10⁹/L)", 30)
+```
+
+### Hematocrit (%)
+
+```{r}
+cont_plot(cohort, "PRHCT", "Hematocrit (%)", 30)
+```
+
+### BUN (mg/dL)
+
+```{r}
+cont_plot(cohort, "PRBUN", "BUN (mg/dL)", 30)
+```
+
+### Creatinine (mg/dL)
+
+```{r}
+cont_plot(cohort, "PRCREAT", "Creatinine (mg/dL)", 30)
+```
+
+### Serum Sodium (mmol/L)
+
+```{r}
+cont_plot(cohort, "PRSODM", "Serum Sodium (mmol/L)", 30)
+```
+
+### Albumin (g/dL)
+
+```{r}
+cont_plot(cohort, "PRALBUM", "Albumin (g/dL)", 25)
+```
+
+### Bilirubin (mg/dL)
+
+```{r}
+cont_plot(cohort, "PRBILI", "Bilirubin (mg/dL)", 25)
+```
+
+### SGOT/AST (U/L)
+
+```{r}
+cont_plot(cohort, "PRSGOT", "SGOT / AST (U/L)", 25)
+```
+
+### Platelet Count (×10⁹/L)
+
+```{r}
+cont_plot(cohort, "PRPLATE", "Platelet Count (×10⁹/L)", 30)
+```
+
+### PTT (seconds)
+
+```{r}
+cont_plot(cohort, "PRPTT", "PTT (seconds)", 25)
+```
+
+### INR (ratio)
+
+```{r}
+cont_plot(cohort, "PRINR", "INR (ratio)", 25)
+```
+
+Row {data-height=150}
+-----------------------------------------------------------------------
+
+### Takeaways
+
+```{r, results='asis'}
+cat(takeaway_eda)
+```
+
+
+Dataset {data-icon="fa-database"}
+=======================================================================
+
+Row {data-height=850}
+-----------------------------------------------------------------------
+
+### About the Data
+
+<div style="padding: 25px 35px; font-size: 15px; line-height: 1.8; color: #000000;">
+
+<h3 style="color: #2E75B6; border-bottom: 2px solid #2E75B6; padding-bottom: 6px;">
+Data Source &amp; Description
+</h3>
+
+<p>
+This dashboard uses data from the <strong>American College of Surgeons National Surgical Quality Improvement Program (ACS-NSQIP)</strong> Participant Use Data Files for 2015–2021. General information about ACS-NSQIP is available from the American College of Surgeons website:
+<a href="https://www.facs.org/quality-programs/data-and-registries/acs-nsqip/" target="_blank">
+https://www.facs.org/quality-programs/data-and-registries/acs-nsqip/
+</a>.
+The analytic cohort includes <strong>13,650 adult patients who underwent isolated coronary artery bypass grafting (CABG)</strong>, identified by relevant CPT codes, with a postoperative pneumonia event rate of about 5.3%.
+Data were prospectively collected by trained Surgical Clinical Reviewers at participating U.S. hospitals through standardized chart abstraction of preoperative and 30-day postoperative variables.
+The study population consists of adult CABG patients across U.S. ACS-NSQIP-participating hospitals between January 1, 2015 and December 31, 2021.
+</p>
+
+<h3 style="color: #C0392B; border-bottom: 2px solid #C0392B; padding-bottom: 6px; margin-top: 20px;">
+Data Availability &amp; Confidentiality
+</h3>
+
+<div style="background: #fdecea; border-left: 5px solid #C0392B; padding: 14px 20px; border-radius: 0 8px 8px 0;">
+<p style="margin: 0;">
+<strong>The ACS-NSQIP dataset used in this dashboard is confidential and cannot be shared publicly.</strong>
+Although ACS-NSQIP data are de-identified, access requires a formal institutional Data Use Agreement (DUA) with the American College of Surgeons.
+<strong>Raw patient-level data are not posted in the GitHub repository and are not redistributable.</strong>
+Only aggregated, non-identifying summary statistics are displayed in this dashboard.
+The rendered static HTML dashboard can be viewed without running the project code, but reproducing the dashboard or the complete machine-learning workflow requires access to the original ACS-NSQIP dataset. Researchers wishing to reproduce the dashboard must obtain the dataset directly through their own institution’s NSQIP DUA.
+</p>
+</div>
+
+<h3 style="color: #2E75B6; border-bottom: 2px solid #2E75B6; padding-bottom: 6px; margin-top: 20px;">
+Variables Shown in This Dashboard
+</h3>
+
+<p><strong>Outcome</strong></p>
+<ul>
+<li>30-day postoperative pneumonia (binary)</li>
+</ul>
+
+<p><strong>Demographics</strong></p>
+<ul>
+<li>Age (years)</li>
+<li>Gender</li>
+<li>Race / Ethnicity</li>
+<li>Body Mass Index (BMI, kg/m²)</li>
+</ul>
+
+<p><strong>Surgical &amp; Anesthesia Context</strong></p>
+<ul>
+<li>Anesthesia Technique</li>
+<li>American Society of Anesthesiologists Physical Status (ASA Class)</li>
+<li>Functional Health Status</li>
+<li>Preoperative Red Blood Cell (RBC) Transfusion</li>
+</ul>
+
+<p><strong>Comorbidities</strong></p>
+<ul>
+<li>Diabetes Mellitus</li>
+<li>Current Smoker</li>
+<li>History of Severe Chronic Obstructive Pulmonary Disease (COPD)</li>
+<li>History of Congestive Heart Failure (CHF)</li>
+<li>Hypertension Requiring Medication</li>
+<li>Currently on Dialysis</li>
+<li>Steroid / Immunosuppressant Use</li>
+<li>Bleeding Disorders</li>
+<li>Disseminated Cancer</li>
+<li>Ascites</li>
+</ul>
+
+<p><strong>Preoperative Laboratory Values</strong></p>
+<ul>
+<li>Serum Sodium (mEq/L)</li>
+<li>Blood Urea Nitrogen (BUN, mg/dL)</li>
+<li>Serum Creatinine (mg/dL)</li>
+<li>Albumin (g/dL)</li>
+<li>Total Bilirubin (mg/dL)</li>
+<li>Aspartate Aminotransferase / Serum Glutamic-Oxaloacetic Transaminase (AST/SGOT, U/L)</li>
+<li>White Blood Cell Count (WBC, K/mm³)</li>
+<li>Hematocrit (HCT, %)</li>
+<li>Platelet Count (K/cumm)</li>
+<li>Partial Thromboplastin Time (PTT, seconds)</li>
+<li>International Normalized Ratio (INR, unitless)</li>
+</ul>
+
+<h3 style="color: #2E75B6; border-bottom: 2px solid #2E75B6; padding-bottom: 6px; margin-top: 20px;">
+Notes &amp; Limitations
+</h3>
+
+<ul>
+<li>All visualizations describe associations only; <strong>no causal inference</strong> should be drawn from this dashboard.</li>
+<li>Pneumonia is a <strong>rare event (~5%)</strong>, so apparent group differences should be interpreted with caution.</li>
+<li>Year-to-year variation may reflect changes in case mix, hospital participation, or external factors such as the COVID-19 pandemic in 2020.</li>
+</ul>
+
+</div>
+
+
+About {data-icon="fa-info-circle"}
+=======================================================================
+
+Row {data-height=850}
+-----------------------------------------------------------------------
+
+### Project Overview
+
+<div style="padding: 25px 35px; font-size: 15px; line-height: 1.8; color: #000000;">
+
+<h3 style="color: #2E75B6; border-bottom: 2px solid #2E75B6; padding-bottom: 6px;">
+Why This Project Matters
+</h3>
+
+<p>
+Although postoperative pneumonia after CABG is a leading driver of prolonged ventilation, ICU stay, and 30-day mortality, its overall patterns, temporal trends, and patient risk-factor distributions remain insufficiently described in large contemporary U.S. surgical datasets.
+By visualizing temporal trends and patient-level distributions across 13,650 CABG cases in ACS-NSQIP (2015–2021), this dashboard supports clinicians, quality-improvement teams, and researchers in identifying high-risk subgroups and informing predictive modeling efforts.
+</p>
+
+<h3 style="color: #2E75B6; border-bottom: 2px solid #2E75B6; padding-bottom: 6px; margin-top: 20px;">
+Source Code &amp; Repository
+</h3>
+
+<p>
+The complete dashboard source code, rendered HTML file, and project README are available in the GitHub repository:
+<a href="https://github.com/yixuan-he425/CABG-pneumonia-dashboard" target="_blank">
+https://github.com/yixuan-he425/CABG-pneumonia-dashboard
+</a>.
+</p>
+
+<h3 style="color: #2E75B6; border-bottom: 2px solid #2E75B6; padding-bottom: 6px; margin-top: 20px;">
+Author
+</h3>
+
+<p>
+Yixuan He, MSPH/MPH Candidate, Department of Biostatistics &amp; Bioinformatics, Rollins School of Public Health, Emory University.
+</p>
+
+</div>
