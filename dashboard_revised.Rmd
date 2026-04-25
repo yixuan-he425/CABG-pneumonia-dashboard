@@ -173,7 +173,7 @@ valueBox(paste0(peak$YEAR, " (", peak$Pneumonia_Rate, "%)"),
 valueBox("2015 – 2021", icon = "fa-calendar", color = "info")
 ```
 
-Row {data-height=550}
+Row {data-height=700}
 -----------------------------------------------------------------------
 
 ### Annual & Cumulative Pneumonia Incidence
@@ -249,7 +249,7 @@ plot_ly() %>%
     yaxis = list(title = "Pneumonia Rate (%)", range = c(0, 9), side = "left"),
     yaxis2 = list(title = "Cumulative CABG Patients", overlaying = "y", side = "right",
                   showgrid = FALSE, range = c(0, max(annual$Cumulative_Patients) * 1.15)),
-    legend = list(orientation = "h", x = 0.5, xanchor = "center", y = -0.25),
+    legend = list(orientation = "h", x = 0.5, xanchor = "center", y = -0.18),
     hovermode = "x unified",
     margin = list(l = 70, r = 80, t = 80, b = 90)
   )
