@@ -249,9 +249,9 @@ plot_ly() %>%
     yaxis = list(title = "Pneumonia Rate (%)", range = c(0, 9), side = "left"),
     yaxis2 = list(title = "Cumulative CABG Patients", overlaying = "y", side = "right",
                   showgrid = FALSE, range = c(0, max(annual$Cumulative_Patients) * 1.15)),
-    legend = list(orientation = "h", x = 0.5, xanchor = "center", y = -0.18),
+    legend = list(orientation = "h", x = 0.5, xanchor = "center", y = -0.25),
     hovermode = "x unified",
-    margin = list(l = 70, r = 80, t = 30, b = 90)
+    margin = list(l = 70, r = 80, t = 80, b = 90)
   )
 ```
 
