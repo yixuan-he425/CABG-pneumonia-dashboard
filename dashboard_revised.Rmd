@@ -902,7 +902,7 @@ Author
 </h3>
 
 <p>
-Yixuan He, MSPH/MPH Candidate, Department of Biostatistics &amp; Bioinformatics, Rollins School of Public Health, Emory University.
+Yixuan He, MSPH Candidate, Department of Biostatistics &amp; Bioinformatics, Rollins School of Public Health, Emory University.
 </p>
 
 </div>
