@@ -4,7 +4,7 @@ An interactive `flexdashboard` exploring the incidence and patient-level distrib
 
 ## Live Dashboard
 
-**[View the dashboard here](https://yixuan-he425.github.io/CABG-pneumonia-dashboard/)** ← replace with your actual GitHub Pages URL after deploying.
+**[View the dashboard here](https://yixuan-he425.github.io/CABG-pneumonia-dashboard/)**
 
 ## Real-world Impact
 
