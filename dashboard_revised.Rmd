@@ -288,10 +288,8 @@ datatable(tbl,
 ```
 
 ### Takeaways
-
-<div style="display: flex; align-items: center; height: 100%; padding: 5px 15px; overflow-y: auto;
-overflow-x: hidden;">
-<div style="color: #000000; font-size: 13px; line-height: 1.6; text-align: left; border-left: 5px solid #2E75B6; background: #eef2f7; padding: 12px 18px; border-radius: 0 8px 8px 0; width: 100%;">
+<div style="height: 100%; max-height: 100%; padding: 5px 15px; overflow-y: auto; overflow-x: hidden; box-sizing: border-box;">
+<div style="color: #000000; font-size: 13px; line-height: 1.6; text-align: left; border-left: 5px solid #2E75B6; background: #eef2f7; padding: 12px 18px; border-radius: 0 8px 8px 0;">
 <strong>The annual pneumonia rate among CABG patients fluctuates between 3.9% and 7.2% from 2015 to 2021</strong>, with no clear long-term upward or downward trend. A noticeable spike occurs in <strong>2020 (7.2%)</strong>, which stands out compared with surrounding years and may reflect disruptions during the COVID-19 era or changes in perioperative risk. Despite these yearly fluctuations, the <strong>overall cumulative incidence remains stable around 5%</strong>, suggesting that the overall pneumonia burden in the cohort was relatively consistent over time.
 </div>
 </div>
