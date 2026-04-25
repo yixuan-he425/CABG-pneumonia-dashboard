@@ -132,7 +132,7 @@ clr_no  <- "#66c2a5"
 clr_yes <- "#fc8d62"
 
 # Reusable takeaway HTML
-takeaway_eda <- '<div style="display: flex; align-items: center; height: 100%; padding: 5px 15px; overflow: hidden;">
+takeaway_eda <- '<div style="display: flex; align-items: flex-start; height: 100%; padding: 5px 15px; overflow-y: auto; overflow-x: hidden;">
 <div style="color: #000000; font-size: 13px; line-height: 1.6; text-align: left; border-left: 5px solid #2E75B6; background: #eef2f7; padding: 12px 18px; border-radius: 0 8px 8px 0; width: 100%;">
 The exploratory dashboard shows that postoperative pneumonia is a <strong>relatively rare outcome, affecting about 5% of CABG patients</strong>. The study population is mostly older and male, with pneumonia cases appearing across the same broad patient groups seen in the full cohort. Some characteristics — such as <strong>bleeding disorders, preoperative transfusion, and higher BUN values</strong> — appear more common among pneumonia cases, but these patterns are descriptive only and would need further analysis to confirm.
 </div>
@@ -242,7 +242,7 @@ plot_ly() %>%
   layout(
     title = list(
     text = "<b>Pneumonia Incidence After CABG Surgery (2015–2021)</b>",
-    font = list(size = 20),
+    font = list(size = 18),
     y = 0.97),
     xaxis = list(title = "Year", tickmode = "linear", dtick = 1,
                  range = c(2014.3, 2021.7), tickvals = 2015:2021),
@@ -289,7 +289,8 @@ datatable(tbl,
 
 ### Takeaways
 
-<div style="display: flex; align-items: center; height: 100%; padding: 5px 15px; overflow: hidden;">
+<div style="display: flex; align-items: center; height: 100%; padding: 5px 15px; overflow-y: auto;
+overflow-x: hidden;">
 <div style="color: #000000; font-size: 13px; line-height: 1.6; text-align: left; border-left: 5px solid #2E75B6; background: #eef2f7; padding: 12px 18px; border-radius: 0 8px 8px 0; width: 100%;">
 <strong>The annual pneumonia rate among CABG patients fluctuates between 3.9% and 7.2% from 2015 to 2021</strong>, with no clear long-term upward or downward trend. A noticeable spike occurs in <strong>2020 (7.2%)</strong>, which stands out compared with surrounding years and may reflect disruptions during the COVID-19 era or changes in perioperative risk. Despite these yearly fluctuations, the <strong>overall cumulative incidence remains stable around 5%</strong>, suggesting that the overall pneumonia burden in the cohort was relatively consistent over time.
 </div>
@@ -350,7 +351,7 @@ plot_ly(tbl_pie,
   pull = c(0, 0.05)
 ) %>%
   layout(
-    title = list(text = "<b>Pneumonia Outcome Distribution</b>", font = list(size = 20)),
+    title = list(text = "<b>Pneumonia Outcome Distribution</b>", font = list(size = 18)),
     showlegend = TRUE,
     legend = list(font = list(size = 12)),
     margin = list(l = 30, r = 30, t = 50, b = 30)
@@ -413,7 +414,7 @@ cat_bar <- function(data, var_col, display_name, mode = "stack") {
 cat_styled <- function(p, display_name) {
   p %>% layout(
     title = list(text = paste0("<b>", display_name, " vs Pneumonia</b>"),
-                 font = list(size = 20)),
+                 font = list(size = 18)),
     xaxis = list(title = display_name),
     legend = list(title = list(text = "Outcome")),
     hovermode = "closest",
@@ -663,7 +664,7 @@ cont_plot <- function(data, var_col, display_name, nbins = 30) {
   subplot(p_box, p_hist, nrows = 2, shareX = TRUE, heights = c(0.25, 0.75)) %>%
     layout(
       title = list(text = paste0("<b>",display_name, " Distribution by Pneumonia Status</b>"),
-                   font = list(size = 20)),
+                   font = list(size = 18)),
       showlegend = TRUE,
       legend = list(title = list(text = "Outcome"), orientation = "v", x = 1.02, y = 0.5),
       margin = list(l = 60, r = 80, t = 50, b = 60),
