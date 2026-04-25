@@ -241,9 +241,9 @@ plot_ly() %>%
   ) %>%
   layout(
     title = list(
-    text = "<b>Pneumonia Incidence After <br> CABG Surgery (2015–2021)</b>",
+    text = "<b>Pneumonia Incidence After <br>CABG Surgery (2015–2021)</b>",
     font = list(size = 18),
-    y = 0.97),
+    y = 0.95),
     xaxis = list(title = "Year", tickmode = "linear", dtick = 1,
                  range = c(2014.3, 2021.7), tickvals = 2015:2021),
     yaxis = list(title = "Pneumonia Rate (%)", range = c(0, 9), side = "left"),
@@ -251,7 +251,7 @@ plot_ly() %>%
                   showgrid = FALSE, range = c(0, max(annual$Cumulative_Patients) * 1.15)),
     legend = list(orientation = "h", x = 0.5, xanchor = "center", y = -0.18),
     hovermode = "x unified",
-    margin = list(l = 70, r = 80, t = 80, b = 90)
+    margin = list(l = 70, r = 80, t = 30, b = 90)
   )
 ```
 
