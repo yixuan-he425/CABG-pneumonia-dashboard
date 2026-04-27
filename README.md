@@ -31,4 +31,4 @@ rmarkdown::render("dashboard_revised.Rmd")
 
 ## Author
 
-Yixuan He, MSPH/MPH Candidate, Rollins School of Public Health, Emory University.
+Yixuan He, MSPH Candidate, Rollins School of Public Health, Emory University.
