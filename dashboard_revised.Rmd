@@ -661,7 +661,7 @@ cont_plot <- function(data, var_col, display_name, nbins = 30) {
   
   subplot(p_box, p_hist, nrows = 2, shareX = TRUE, heights = c(0.25, 0.75)) %>%
     layout(
-      title = list(text = paste0("<b>",display_name, " Distribution by Pneumonia Status</b>"),
+      title = list(text = paste0("<b>",display_name, "<br>Distribution by Pneumonia Status</b>"),
                    font = list(size = 18)),
       showlegend = TRUE,
       legend = list(title = list(text = "Outcome"), orientation = "v", x = 1.02, y = 0.5),
